@@ -21,7 +21,7 @@ import {
   useUserSigner,
 } from "./hooks";
 // import Hints from "./Hints";
-import { ExampleUI, Hints, Subgraph } from "./views";
+import { ExampleUI, Hints, Subgraph, SuperFluidView } from "./views";
 
 const { ethers } = require("ethers");
 /*
@@ -44,10 +44,10 @@ const { ethers } = require("ethers");
 */
 
 /// 📡 What chain are your contracts deployed to?
-const targetNetwork = NETWORKS.localhost; // <------- select your target frontend network (localhost, rinkeby, xdai, mainnet)
+const targetNetwork = NETWORKS.kovan; // <------- select your target frontend network (localhost, rinkeby, xdai, mainnet)
 
 // 😬 Sorry for all the console logging
-const DEBUG = true;
+const DEBUG = false;
 const NETWORKCHECK = true;
 
 // 🛰 providers
@@ -411,6 +411,20 @@ function App(props) {
               ExampleUI
             </Link>
           </Menu.Item>
+
+          <Menu.Item key="/superfluid">
+            <Link
+              onClick={() => {
+                setRoute("/superfluid");
+              }}
+              to="/superfluid"
+            >
+              SuperFluid View 
+            </Link>
+          </Menu.Item>
+
+
+
           <Menu.Item key="/mainnetdai">
             <Link
               onClick={() => {
@@ -457,6 +471,19 @@ function App(props) {
               price={price}
             />
           </Route>
+
+          <Route path="/superfluid">
+            <SuperFluidView
+              address={address}
+              yourLocalBalance={yourLocalBalance}
+              localProvider={localProvider}
+              injectedProvider={injectedProvider}
+              price={price}
+              selectedChainId={selectedChainId}
+              mainnetProvider={mainnetProvider}
+            /> 
+          </Route>
+
           <Route path="/exampleui">
             <ExampleUI
               address={address}

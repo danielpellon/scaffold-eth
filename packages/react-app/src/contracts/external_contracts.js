@@ -785,8 +785,9 @@ const DAIABI = [
 ];
 
 // Mainnet DAI, Optimism and Arbitrium Rollup Contracts with local addresses
+// TODO: restore previous chainID and do this on commponent file
 module.exports = {
-  1: {
+  42: {
     contracts: {
       DAI: {
         address: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
@@ -796,6 +797,14 @@ module.exports = {
         address: "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
         abi: ERC20ABI,
       },
+      fDAI: {
+        address: '0xb64845d53a373d35160b72492818f0d2f51292c0',
+        abi: DAIABI,
+      },
+      fDAIx: {
+        address: "0xe3cb950cb164a31c66e32c320a800d477019dcff",
+        abi: ERC20ABI,
+      }
     },
   },
 };
