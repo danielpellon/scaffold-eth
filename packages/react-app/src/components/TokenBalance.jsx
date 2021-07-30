@@ -13,6 +13,10 @@ export default function TokenBalance(props) {
 
   let usingBalance = balance;
 
+  if (!props.fontSize) {
+    props.fontSize=16;
+  }
+
   if (typeof props.balance !== "undefined") {
     usingBalance = props.balance;
   }
@@ -33,7 +37,7 @@ export default function TokenBalance(props) {
     <span
       style={{
         verticalAlign: "middle",
-        fontSize: 24,
+        fontSize: props.fontSize,
         padding: 8,
         cursor: "pointer",
       }}
