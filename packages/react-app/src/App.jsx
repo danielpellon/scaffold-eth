@@ -481,6 +481,7 @@ function App(props) {
               price={price}
               selectedChainId={selectedChainId}
               mainnetProvider={mainnetProvider}
+              gasPrice={gasPrice}
             /> 
           </Route>
 
