@@ -482,6 +482,7 @@ function App(props) {
               selectedChainId={selectedChainId}
               mainnetProvider={mainnetProvider}
               gasPrice={gasPrice}
+              tokens={["fDAI", "fUSDC"]}
             /> 
           </Route>
 
@@ -509,16 +510,6 @@ function App(props) {
               address={address}
               blockExplorer="https://etherscan.io/"
             />
-            {/*
-            <Contract
-              name="UNI"
-              customContract={mainnetContracts && mainnetContracts.contracts && mainnetContracts.contracts.UNI}
-              signer={userSigner}
-              provider={mainnetProvider}
-              address={address}
-              blockExplorer="https://etherscan.io/"
-            />
-            */}
           </Route>
           <Route path="/subgraph">
             <Subgraph

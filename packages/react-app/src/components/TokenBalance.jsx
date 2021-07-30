@@ -12,9 +12,9 @@ export default function TokenBalance(props) {
   let floatBalance = parseFloat("0.00");
 
   let usingBalance = balance;
-
-  if (!props.fontSize) {
-    props.fontSize=16;
+  let fontSize=16;
+  if (props.fontSize) {
+    fontSize=props.fontSize;
   }
 
   if (typeof props.balance !== "undefined") {
@@ -37,7 +37,7 @@ export default function TokenBalance(props) {
     <span
       style={{
         verticalAlign: "middle",
-        fontSize: props.fontSize,
+        fontSize,
         padding: 8,
         cursor: "pointer",
       }}

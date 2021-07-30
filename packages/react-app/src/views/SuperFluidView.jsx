@@ -10,6 +10,7 @@ export default function SuperFluidView(
       price,
       selectedChainId,
       mainnetProvider,
+      tokens,
     }) {
   return (
     <SuperFluidComponent
@@ -19,6 +20,7 @@ export default function SuperFluidView(
       price={price}
       selectedChainId={selectedChainId}
       mainnetProvider={mainnetProvider}
+      tokens={tokens}
       />
   );
 };
