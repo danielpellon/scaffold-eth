@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from "react";
 import SuperfluidSDK from "@superfluid-finance/js-sdk";
-import { Button, Divider, Input, Form, InputNumber } from "antd";
+import { Button, Divider, Input, Form, InputNumber, Select } from "antd";
 import { utils } from "ethers";
 
 import { Address, AddressInput, TokenBalance } from "../components";
 import {Transactor} from "../helpers";
 
 import { useUserSigner } from "../hooks"
-const fDAIxAddress = "0xe3cb950cb164a31c66e32c320a800d477019dcff";
+const { Option } = Select;
 
-// displays Superfluid inflows, outflows and netflows using the sfSDK for a given token
+
+// displays Superfluid inflows, outflows and netflows for a given user and token
 function CashflowDisplayer({
   sfUser,
   name,
@@ -17,18 +18,24 @@ function CashflowDisplayer({
 }) {
 
   const [details, setDetails] = useState();
+  const [errMsg, setErrMsg] = useState();
 
+  // load cash flow details on user change
   useEffect(async () => {
     for(const token of tokens) {
       if(sfUser && sfUser.hasOwnProperty(token)) {
-        const det = await sfUser[token].details();
-        console.log("ignore ", det);
-        setDetails((prevState) =>{
-          return {
-            ...prevState,
-            [token]: det
-          }
-        });
+        try {
+          const det = await sfUser[token].details();
+          setDetails((prevState) =>{
+            return {
+              ...prevState,
+              [token]: det
+            }
+          });
+          setErrMsg("");
+        } catch(err) {
+          setErrMsg(err.toString());
+        }
       }
     }
   }, [sfUser])
@@ -48,6 +55,7 @@ function CashflowDisplayer({
           template.push(
             <div>
               <h3>{name} {token} {flowType}</h3>
+              {errMsg}
             </div>
           );
 
@@ -121,9 +129,16 @@ function RecipientForm({onRecipientSubmit, onRecipientFailed}) {
 
 // form to start a new flow/stream 
 function FlowForm({
+  tokens,
+  sfRecipient,
   onFlowSubmit,
   onFlowFailed
 }) {
+  
+  const tokenOptions = [];
+  for(const token of tokens) {
+    tokenOptions.push(<Option value={token}>{token}</Option>)
+  }
   return (
       <Form
         layout="vertical"
@@ -142,6 +157,14 @@ function FlowForm({
           />
         </Form.Item>
 
+        <Form.Item name="token">
+          <Select>
+            {tokenOptions}
+          </Select>
+        </Form.Item>
+
+        <Form.Item name="sfRecipient" initialValue={sfRecipient}></Form.Item>
+
         <Form.Item >
           <Button type="primary" htmlType="submit">
             Create new flow
@@ -155,12 +178,11 @@ function FlowForm({
 // form to wrap/unwrap them
 function SuperTokenUpgrader({
   address,
-  name,
   token,
   tokenContracts,
   superTokenContracts,
   gasPrice,
-  userProvider  
+  userProvider,
 }) {
   
   if(!address || !tokenContracts.hasOwnProperty(token+"x")){
@@ -193,16 +215,16 @@ function SuperTokenUpgrader({
     }).then(result => {console.log(result)});
   };  
 
-  const onMintSubmit = (values) => {
+  const transformToken = (amount, transformType) => {
     // parse user submitted amount
-    const parsedBalance = utils.parseUnits(values.fDAI.toString(), 18);
+    const parsedBalance = utils.parseUnits(amount.toString(), 18);
+    // retrieve supertoken contract object
+    const contractCall = superTokenContracts[token + "x"][transformType](parsedBalance);
 
     // create and execute transaction
     const tx = Transactor(userProvider, gasPrice);
-
     // TODO: decide wether to keep tx logging or not (modals already displayed)
-    console.log(superTokenContracts.fDAIx.upgrade);
-    tx(superTokenContracts.fDAIx.upgrade(parsedBalance), update => {
+    tx(contractCall, update => {
       console.log("📡 Transaction Update:", update);
       if (update && (update.status === "confirmed" || update.status === 1)) {
         console.log(" 🍾 Transaction " + update.hash + " finished!");
@@ -217,49 +239,54 @@ function SuperTokenUpgrader({
         );
       }
     }).then(result => {console.log(result)});
+  }
+
+  // handle upgrade token form submit
+  const handleUpgradeSubmit = ({amount, transformType}) => {
+    transformToken(amount, "upgrade");
+  };
+
+  // handle downgrade token form submit
+  const handleDowngradeSubmit = ({amount, transformType}) => {
+    transformToken(amount, "downgrade");
   };
   
+  const handleError = (errMsg) => {
+    console.log('Failed:', errMsg);
+  } 
 
-  const onMintFailed = (errorInfo) => {
-    console.log('Failed:', errorInfo);
-  };
-
-  return(
+  const template = [];
+  template.push(
     <div>
-      <h2>{name} balances</h2>
-      <h3>fDAI: </h3>
+      <h3>{token}: </h3> 
       <TokenBalance 
+        img={token}
         name={token}
         provider={userProvider}
         address={address} 
         contracts={tokenContracts}
       />
-      <div>
-        <Form
-          name="basic"
-          layout="vertical"
-          onFinish={onMintSubmit}
-          onFinishFailed={onMintFailed}
-          requiredMark={false}>
-          <Form.Item 
-            name={token}
-            initialValue={0}
-            >
-            <InputNumber/>
-          </Form.Item>
-          <div>
-            <Button display="block" onClick={onTokenApprove}>
-              Approve unlimited {token} spending
-            </Button>
-            <Form.Item>
-              <Button htmlType="submit">
-                Upgrade to supertoken
-              </Button>
-            </Form.Item>
-          </div>
-          
-        </Form>
-      </div>
+      <Form
+        name="basic"
+        layout="vertical"
+        onFinish={handleUpgradeSubmit}
+        onFinishFailed={handleError}
+        requiredMark={false}>
+        <Form.Item 
+          name="amount"
+          initialValue={0}
+          >
+          <InputNumber/>
+        </Form.Item>
+        <Button display="block" onClick={onTokenApprove}>
+          Approve unlimited {token} spending
+        </Button>
+        <Form.Item>
+          <Button htmlType="submit">
+            Upgrade to supertoken
+          </Button>
+        </Form.Item>
+      </Form>
       <h3>{token}x: </h3>
       <TokenBalance 
         name={token + "x"}
@@ -267,8 +294,29 @@ function SuperTokenUpgrader({
         address={address} 
         contracts={superTokenContracts}
       />
+      <Form
+        name="basic"
+        layout="vertical"
+        onFinish={handleDowngradeSubmit}
+        onFinishFailed={handleError}
+        requiredMark={false}>
+        <Form.Item 
+          name="amount"
+          initialValue={0}
+          >
+          <InputNumber/>
+        </Form.Item>
+
+        <Form.Item>
+          <Button htmlType="submit">
+            Downgrade to unwrapped token
+          </Button>
+        </Form.Item>
+      </Form>
+      <Divider/>
   </div>
   )
+  return template;
 }
 
 // TODO: need to do free up (the sdk?) when exiting component to avoid memory leak
@@ -283,14 +331,14 @@ export default function SuperFluidComponent(
   }) {
 
   const [sfSDK, setSfSDK] = useState();
-  const [recipient, setRecipient] = useState();
+  const [recipients, setRecipients] = useState([]);
   const [sfUser, setSfUser] = useState({});
   const [sfUserDetails, setSfUserDetails] = useState({});
-  const [sfRecipient, setSfRecipient] = useState();
+  const [sfRecipients, setSfRecipients] = useState({}); 
   const [tokenContracts, setTokenContracts] = useState({});
   const [superTokenContracts, setSuperTokenContracts] = useState();
   const [initializationError, setInitializationError] = useState("");
-  const [superTokenAddresses, setSuperTokenAddresses] = useState({});
+
   // scaffold-eth hooks
   // get user provider
   const userProvider = useUserSigner(injectedProvider, localProvider);
@@ -329,12 +377,6 @@ export default function SuperFluidComponent(
             address: address,
             token: superTokenAddress
           });
-          setSuperTokenAddresses((prevState) => {
-            return {
-              ...prevState,
-              [token]: superTokenAddress
-            }
-          });
           setSfUser((prevState) => {
             return {
               ...prevState,
@@ -343,34 +385,43 @@ export default function SuperFluidComponent(
           });
         }
       }
+      console.log("target: ", sfUser)
     }    
-  }, [sfSDK, tokenContracts]);
+  }, [tokenContracts]);
 
   // once user sets a new recipient, load its superfluid sdk user details
   useEffect(async () => {
-    if (sfSDK && recipient && recipient.hasOwnProperty("address")) {
-      for (const token of tokens) {
-        if (tokenContracts.hasOwnProperty(token+ "x")) {
-          const superTokenAddress= tokenContracts[token + "x"].address;
-          const recipientUser = sfSDK.user({
-            address: address,
-            token: superTokenAddress
-          });
-          setSfRecipient((prevState) => {
-            return {
-              ...prevState,
-              [token]: recipientUser
-            }
-          });
+    if (sfSDK && recipients.length && recipients[0].hasOwnProperty("address")) {
+      for (const recipient of recipients) {
+        for (const token of tokens) {
+          if (tokenContracts.hasOwnProperty(token+ "x")) {
+            const superTokenAddress= tokenContracts[token + "x"].address;
+            const recipientUser = sfSDK.user({
+              address: recipient.address,
+              token: superTokenAddress
+            });
+            setSfRecipients((prevState) => {
+              const prevRecipient = prevState[recipient.name];
+              return (
+                {
+                  ...prevState,
+                  [recipient.name]: {
+                    ...prevRecipient,
+                    [token]: recipientUser,
+                  }
+                }
+              )
+            });
+          }
         }
       }
     }
-  }, [recipient, sfUserDetails])
+  }, [recipients])
 
 
   // Form handlers:
   const onRecipientSubmit = (values) => {
-    setRecipient(values);
+    setRecipients([...recipients, values]);
   };
 
   const onRecipientFailed = (errorInfo) => {
@@ -379,11 +430,12 @@ export default function SuperFluidComponent(
 
   const onFlowSubmit = async (values) => {
     const flowRate = values.flowRate || 0;
-    await sfUser.flow({
-      recipient: recipient.address,
+
+    await sfUser[values.token].flow({
+      recipient: values.sfRecipient[values.token].address,
       flowRate
     })
-    const details = await sfUser.details();
+    const details = await sfUser[values.token].details();
     setSfUserDetails(details);
     console.log('Success:', values);
   };
@@ -392,16 +444,13 @@ export default function SuperFluidComponent(
   const onFlowFailed = (errorInfo) => {
     console.log('Failed:', errorInfo);
   };
-  
-  const template=[];
-  template.push(
-    <div style={{ border: "1px solid #cccccc", padding: 16, width: 400, marginTop: 64, marginBottom: 64 }}>
-      <h1>Superfluid </h1>
-      <p style={{color: "red"}}>{initializationError}</p>
-      <Divider/>
+
+  const superTokenUpgraders = [];
+  for (const token of tokens) {
+    superTokenUpgraders.push(
       <SuperTokenUpgrader 
         name="Your"
-        token={"fDAI"}
+        token={token}
         address={address}
         selectedChainId={selectedChainId}
         userProvider={userProvider}
@@ -411,7 +460,16 @@ export default function SuperFluidComponent(
         sfUser={sfUser}
         localProvider={localProvider}
       />
+    )
+  }
+  
+  const template=[];
+  template.push(
+    <div style={{ border: "1px solid #cccccc", padding: 16, width: 400, marginTop: 64, marginBottom: 64 }}>
+      <h1>Superfluid </h1>
+      <p style={{color: "red"}}>{initializationError}</p>
       <Divider/>
+      {superTokenUpgraders}
 
       <RecipientForm
        onRecipientSubmit={onRecipientSubmit}
@@ -428,40 +486,47 @@ export default function SuperFluidComponent(
     </div>
   );
 
-  if (recipient) {
-    template.push(
-    <div style={{ border: "1px solid #cccccc", padding: 16, width: 400, marginTop: 64, alignSelf:"flex-start" }}>
-      <h3>Balances</h3>
-      <TokenBalance 
-        img="fDAI"
-        name={"fDAI"}
-        provider={userProvider}
-        address={recipient.address} 
-        contracts={tokenContracts}
-        fontSize={14} />
-      <TokenBalance 
-        img="fDAIx"
-        name={"fDAIx"}
-        provider={userProvider}
-        address={address} 
-        contracts={tokenContracts}
-        fontSize={14} />
+  if (sfRecipients) {
+    for (const [name, sfRecipient] of Object.entries(sfRecipients)) {
+      template.push(
+        <div style={{ border: "1px solid #cccccc", padding: 16, width: 400, marginTop: 64, alignSelf:"flex-start" }}>
+          <h2>{name}</h2>
+          <FlowForm
+            name={name}
+            tokens={tokens}
+            sfRecipient={sfRecipient}
+            onFlowSubmit={onFlowSubmit}
+            onFlowFailed={onFlowFailed}/>
+          <h3>Balances</h3>
+          
+          <TokenBalance 
+            img={sfRecipient.token}
+            name={sfRecipient.token}
+            provider={userProvider}
+            address={sfRecipient.address} 
+            contracts={tokenContracts}
+            fontSize={14} />
+          <TokenBalance 
+            img={sfRecipient.token + "x"}
+            name={sfRecipient.token + "x"}
+            provider={userProvider}
+            address={address} 
+            contracts={tokenContracts}
+            fontSize={14} />
 
-      <CashflowDisplayer
-        name={recipient.name}
-        tokens={tokens}
-        sfUser={sfRecipient}/>
-
-      <FlowForm
-        onFlowSubmit={onFlowSubmit}
-        onFlowFailed={onFlowFailed}/>
-    </div>
-    );
+          <CashflowDisplayer
+            name={name}
+            tokens={tokens}
+            sfUser={sfRecipient}/>
+        </div>
+      );
+    }
   }
 
   const containerStyle={
     display: "flex", 
-    minWidth: 400,  
+    flexWrap: "wrap",
+    minWidth: 400,
     margin: "auto",
     justifyContent: "space-evenly", 
   }
